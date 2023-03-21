@@ -20,7 +20,7 @@ cache_directory = os.path.join(current_directory, '_cache')
 plots_directory = os.path.join(current_directory, '_plots')
 fastf1.Cache.enable_cache(cache_directory)
 
-def nanIsaccurate(laps, num):
+def nanIsaccurate(session, num):
     act_lapp = session.laps.loc[session.laps["DriverNumber"]==num,"LapTime"]
     act_corr = session.laps.loc[session.laps["DriverNumber"]==num,"IsAccurate"]
     out = []
@@ -31,6 +31,23 @@ def nanIsaccurate(laps, num):
             out.append(float("nan"))
     return out
 
+def adefinir(session, drivers_num):
+    val = {}
+    for num in drivers_num :
+        val[num] = []
+    max_lap = np.max(session.laps["LapNumber"])
+    for n_laps in range(1,max_lap+1):
+        act_lapp = session.laps.loc[session.laps["LapNumber"]==n_laps,["LapStartTime","DriverNumber"]]
+        fastest = np.min(act_lapp["LapStartTime"])
+        for sta_time, numb in zip(act_lapp['LapStartTime'], act_lapp['DriverNumber']):
+            val[numb].append(sta_time-fastest)
+    act_lapp = session.laps.loc[session.laps["LapNumber"]==n_laps,["LapTime", "LapStartTime", "DriverNumber"]]
+    act_lapp["LapEndTime"] = act_lapp["LapStartTime"]+act_lapp["LapTime"]
+    fastest = np.min(act_lapp["LapEndTime"])
+    for sta_time, numb in zip(act_lapp['LapEndTime'], act_lapp['DriverNumber']):
+        val[numb].append(sta_time-fastest)
+    return val  
+    
 session = fastf1.get_session(2023, 2, 'R')
 session.load()
 
@@ -38,14 +55,7 @@ session.load()
 print(session.laps.columns)
 #print(session.laps.loc[session.laps["DriverNumber"]=="1",["DriverNumber","LapTime"]])
 print(session.laps.loc[session.laps["DriverNumber"]=="1","LapTime"])
-print(session.laps.loc[session.laps["DriverNumber"]=="1",["LapTime","IsAccurate", "TyreLife"]])
-
-#%%
-ver_lapp = session.laps.loc[session.laps["DriverNumber"]=="1","LapTime"]
-ver_lapp_2 = ver_lapp[session.laps["IsAccurate"]]
-print(ver_lapp_2)
-plt.plot(np.arange(len(ver_lapp_2)),ver_lapp_2)
-
+print(session.laps.loc[session.laps["DriverNumber"]=="1",["LapTime","LapStartTime", "LapNumber"]])
 
 #%%
 drivers_num = pd.unique(session.laps['DriverNumber'])
@@ -68,11 +78,10 @@ for index, lap in enumerate(list_fastest_laps):
         team_colors.append(color)
     else : 
         team_colors.append("#d9ca82")
-print(team_reach)
 #%%
 plt.figure(figsize = (20,10))
 for ind, color, num ,name, marker in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, markers):
-    plt.plot(nanIsaccurate(session.laps,num),c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
+    plt.plot(nanIsaccurate(session,num),c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
 
 plt.title("Driver laptime",fontsize=30, fontweight = 'bold')
 plt.xlabel("Laps",fontsize=20)
@@ -82,11 +91,11 @@ plt.legend()
 plt.savefig(plots_directory + "\\lap_time.png",bbox_inches='tight')
 plt.close("all")
 #%%
-look = ['PER', 'VER', 'ALO', 'HAM', 'LEC']
+look = ['PER', 'VER', 'ALO', 'HAM', 'LEC', 'STR']
 plt.figure(figsize = (20,10))
 for ind, color, num ,name, marker in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, markers):
     if name in look :
-        plt.plot(nanIsaccurate(session.laps,num),c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
+        plt.plot(nanIsaccurate(session,num),c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
 
 plt.title("Driver laptime",fontsize=30, fontweight = 'bold')
 plt.xlabel("Laps",fontsize=20)
@@ -96,4 +105,41 @@ plt.legend()
 plt.savefig(plots_directory + "\\lap_time_few.png",bbox_inches='tight')
 plt.close("all")
 
-    
+#%% plot position graph
+
+
+fig = plt.figure(figsize =(20,10))
+  
+ax =plt.Subplot(fig, 111)
+fig.add_subplot(ax)
+val = adefinir(session, drivers_num)
+for ind, color, num ,name, marker, time in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, markers, val.values()):
+    if name in look :    
+        plt.plot([elt.total_seconds() for elt in time],c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
+
+ax.invert_yaxis()
+plt.title("Time difference from the leader",fontsize=30, fontweight = 'bold')
+plt.xlabel("Laps",fontsize=20)
+plt.ylabel("Time (s)",fontsize=20)
+plt.grid(True)
+plt.legend()
+plt.savefig(plots_directory + "\\ecart_leader_few.png",bbox_inches='tight')
+plt.close("all") 
+
+
+fig = plt.figure(figsize =(20,10))
+  
+ax =plt.Subplot(fig, 111)
+fig.add_subplot(ax)
+val = adefinir(session, drivers_num)
+for ind, color, num ,name, marker, time in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, markers, val.values()):
+    plt.plot([elt.total_seconds() for elt in time],c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
+
+ax.invert_yaxis()
+plt.title("Time difference from the leader",fontsize=30, fontweight = 'bold')
+plt.xlabel("Laps",fontsize=20)
+plt.ylabel("Time (s)",fontsize=20)
+plt.grid(True)
+plt.legend()
+plt.savefig(plots_directory + "\\ecart_leader.png",bbox_inches='tight')
+plt.close("all") 
