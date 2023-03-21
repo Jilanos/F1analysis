@@ -47,6 +47,18 @@ def adefinir(session, drivers_num):
     for sta_time, numb in zip(act_lapp['LapEndTime'], act_lapp['DriverNumber']):
         val[numb].append(sta_time-fastest)
     return val  
+
+
+     
+def min_pos(array):
+    n=len(array)
+    maxi,Imaxi = array[0],0
+    for i in range(n):
+        elt = array[i]
+        if elt<maxi:
+            maxi,Imaxi=elt,i
+    return maxi,Imaxi 
+
     
 session = fastf1.get_session(2023, 2, 'R')
 session.load()
@@ -66,13 +78,16 @@ for drv in drivers_num:
     list_fastest_laps.append(drvs_fastest_lap)
 team_colors = list()
 markers = list()
+line_style = list()
 team_reach = list()
 for index, lap in enumerate(list_fastest_laps):
     team_reach.append(lap['Team'])
     if team_reach.count(lap['Team'])==1:
         markers.append('o')
+        line_style.append('-')
     else :
         markers.append('^')
+        line_style.append('dotted')
     color = fastf1.plotting.team_color(lap['Team'])
     if color != "#ffffff":
         team_colors.append(color)
@@ -118,12 +133,12 @@ for ind, color, num ,name, marker, time in zip(np.arange(len(drivers_num)), team
         plt.plot([elt.total_seconds() for elt in time],c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
 
 ax.invert_yaxis()
-plt.title("Time difference from the leader",fontsize=30, fontweight = 'bold')
+plt.title("Time delta to the leader",fontsize=30, fontweight = 'bold')
 plt.xlabel("Laps",fontsize=20)
 plt.ylabel("Time (s)",fontsize=20)
 plt.grid(True)
 plt.legend()
-plt.savefig(plots_directory + "\\ecart_leader_few.png",bbox_inches='tight')
+plt.savefig(plots_directory + "\\delta_leader_few.png",bbox_inches='tight')
 plt.close("all") 
 
 
@@ -131,15 +146,70 @@ fig = plt.figure(figsize =(20,10))
   
 ax =plt.Subplot(fig, 111)
 fig.add_subplot(ax)
-val = adefinir(session, drivers_num)
 for ind, color, num ,name, marker, time in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, markers, val.values()):
     plt.plot([elt.total_seconds() for elt in time],c = color, label = name,linestyle='--',marker=marker ,markersize=7, )
-
 ax.invert_yaxis()
-plt.title("Time difference from the leader",fontsize=30, fontweight = 'bold')
+plt.title("Time delta to the leader",fontsize=30, fontweight = 'bold')
 plt.xlabel("Laps",fontsize=20)
 plt.ylabel("Time (s)",fontsize=20)
 plt.grid(True)
 plt.legend()
-plt.savefig(plots_directory + "\\ecart_leader.png",bbox_inches='tight')
+plt.savefig(plots_directory + "\\delta_leader.png",bbox_inches='tight')
 plt.close("all") 
+
+#%% Grid Position movement
+max_lap = np.max(session.laps["LapNumber"])
+timing = np.empty((20,max_lap))
+timing[:] = np.nan   
+for key, value in val.items():
+    pos_driver = np.where(np.array(drivers_num) == key)
+    for i, elt in enumerate(value[1:]):
+        timing[pos_driver, i] = elt.total_seconds()
+
+
+position = np.empty((20,max_lap))
+position[:] = np.nan  
+abandon = 0
+new_ab= False
+for n_laps in range(max_lap):
+    j = 0
+    while j< 20-abandon :
+        mini= np.nanmin(timing[:,n_laps])
+        pos_min = np.where(timing[:,n_laps] == mini)
+        if mini != 99999e30:
+            position[pos_min, n_laps] = j+1
+            timing[pos_min,n_laps] = 99999e30
+        else :
+            abandon +=20-abandon-1-j
+            new_ab = True
+        j+=1
+    if new_ab:
+        for i in range(19,-1,-1):
+            print(np.isnan(timing[i,n_laps]))
+            if np.isnan(timing[i,n_laps]):
+                print("find one")
+                position[i, n_laps:]=np.ones((1,max_lap-n_laps))*(20-abandon)
+                timing[i, n_laps:]=np.ones((1,max_lap-n_laps))*99999e30
+        new_ab=False
+
+        
+        
+fig = plt.figure(figsize =(20,10))
+ax = plt.Subplot(fig, 111)
+for ind, color, num ,name, marker, time in zip(np.arange(len(drivers_num)), team_colors, drivers_num, drivers_name, line_style, val.values()):
+    plt.plot(position[ind],c = color, label = name,linestyle = marker, linewidth=6 )
+plt.title("Driver position",fontsize=30, fontweight = 'bold')
+plt.xlabel("Laps",fontsize=20)
+plt.ylabel("Position",fontsize=20)
+plt.grid(True)
+plt.xlim([0,max_lap+4])
+plt.ylim([20.25, 0.75])
+plt.legend()
+plt.savefig(plots_directory + "\\position.png",bbox_inches='tight')
+plt.close("all")             
+
+    
+
+
+
+
